@@ -1,0 +1,53 @@
+/* 
+    Document   : css
+    Created on : 19-Apr-2013, 21:08:03
+    Author     : chris
+    Description:
+        Purpose of the stylesheet follows.
+*/
+
+root { 
+    display: block;
+}
+
+body {
+    color: darkslategray;
+}
+
+a {
+    color:black;
+}
+
+#header {
+    
+}
+
+#todotxt {
+    float:left;
+    width: 70%;
+}
+
+#tools {
+    float: left;
+    width: 30%;
+}
+
+#footer {
+    clear:both;
+}
+
+.priority {
+    font-weight: bold;
+}
+
+.priority-A a {
+    color: red;
+}
+
+.priority-B a {
+    color: orange;
+}
+
+.priority-C a {
+    color: green;
+}
