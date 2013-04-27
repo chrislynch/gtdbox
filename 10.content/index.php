@@ -1,7 +1,9 @@
 <?php
 $file = '/home/chris/Dropbox/Apps/gtdbox/todo.txt';
 $todotxt = file_get_contents($file);
-file_put_contents($file, $todotxt)
+$tasks = todotxt_to_array($todotxt);
+print '<pre>' . print_r($tasks,TRUE) . '</pre>';
+// file_put_contents($file, $todotxt)
 
 ?>
 
@@ -43,6 +45,90 @@ file_put_contents($file, $todotxt)
 </html>
 
 <?php
+
+function todotxt_to_array($todotxt){
+    /*
+     * Parse a todo.txt string and create a structured array of all the tasks within
+     */
+    $todos = array();
+    $lines = explode("\n",$todotxt);
+    foreach($lines as $line){
+        $line = rtrim($line);
+        if (strlen($line) > 0){
+            $todo = newtodoarray();
+            $words = explode(' ',$words);
+            $firstword = TRUE;
+            foreach($words as $word){
+                $letters = str_split($word);
+                if ($firstword){
+                    if ($letters[0] == '('){
+                        // The word is the priority
+                        // We *should* hit a creation date after this, so stay in first word mode
+                        $todo['priority'] = $letters[1];
+                        unset($word);
+                    } else {
+                        if(is_numeric($letters[0])){
+                            // This should be the creation date then
+                            // Creation date comes *after* priority so we can come out of first word mode now.
+                            $todo['created'] = $word;
+                            unset($word);
+                            $firstword = FALSE;
+                        } else {
+                            // This is something else. We can exit first word mode
+                            $firstword = FALSE;
+                        }
+                    }
+                } 
+                if (!$firstword && isset($word)){
+                    // We are out of first word mode and have a word to process.
+                    switch($letters[0]){
+                        // todo.txt standard items
+                        case '@': $todo['contexts'][] = $word; break;
+                        case '+': $todo['projects'][] = $word; break;
+                        // Hashtag extension, seen elsewhere
+                        case '#': $todo['hashtags'][] = $word; break;
+                        // My extensions - Value and Waiting On
+                        case '_': $todo['waitingon'][] = $word; break;
+                        case '£': case '$': $todo['value'] = strval(substr($word,1)); break;
+                        default : 
+                            if (strstr($word,':')){
+                                // This might be an extension, like due:XXXX
+                                // If there is a space after the :, this breaks the magic
+                                $worddata = explode(':',$word);
+                                if (ltrim($word[1] == $word[1])){
+                                    $key = array_shift($worddata);
+                                    $todo['extensions'][$key] = implode(':',$worddata);
+                                } else {
+                                    $todo['task'] .= $word . ' ';
+                                }
+                            } else {
+                                $todo['task'] .= $word . ' ';
+                            }
+                    }
+                }
+            }
+            $todos[] = $todo;
+        }
+    }
+    
+    return $todos;
+}
+
+function newtodoarray(){
+    return array('priority' => 'c','created' => time(),
+                 'contexts' => array(), 'projects' => array(), 
+                 'hashtags' => array(), 'waitingon' => array(),
+                 'task' => '',
+                 'extensions' => array(),
+                 'value' => 0);
+}
+
+function array_to_todotxt($todoarray){
+    /*
+     * Transform a structured array of todo items into a string,
+     * normally for writing back to a file.
+     */
+}
 
 function formattodotxt($todotxt){
     $return = '';
