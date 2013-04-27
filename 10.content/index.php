@@ -2,7 +2,7 @@
 $file = '/home/chris/Dropbox/Apps/gtdbox/todo.txt';
 $todotxt = file_get_contents($file);
 $todos = todotxt_to_array($todotxt);
-print '<pre>' . print_r($todos,TRUE) . '</pre>';
+
 // file_put_contents($file, $todotxt)
 
 ?>
@@ -20,9 +20,21 @@ print '<pre>' . print_r($todos,TRUE) . '</pre>';
             </form>
         </div>
         <div id="todotxt">
-        <?php
-            print formattodotxt($todotxt);
-        ?>
+            <?php
+                foreach($todos['priority'] as $priority){
+                    print "<h1>Priority $priority</h1><table>";
+                    foreach($todos['todos'] as $todo){
+                        if ($todo['priority'] == $priority){
+                            print " <tr>
+                                        <td>{$todo['priority']}</td>
+                                        <td>" . str_ireplace('-', '&nbsp;', $todo['created']) ."</td>
+                                        <td>{$todo['task']}</td>
+                                    </tr>";    
+                        }
+                    }
+                    print "</table>";
+                }  
+            ?>
         </div>
         <div id="tools">
             <h2>Tools</h2>
@@ -55,73 +67,73 @@ function todotxt_to_array($todotxt){
     foreach($lines as $line){
         $line = rtrim($line);
         if (strlen($line) > 0){
-            $todo = newtodoarray();
-            $words = explode(' ',$line);
-            $firstword = TRUE;
-            foreach($words as $word){
-                $letters = str_split($word);
-                if ($firstword){
-                    if ($letters[0] == '('){
-                        // The word is the priority
-                        // We *should* hit a creation date after this, so stay in first word mode
-                        $todo['priority'] = $letters[1];
-                        unset($word);
-                    } else {
-                        if(is_numeric($letters[0])){
-                            // This should be the creation date then
-                            // Creation date comes *after* priority so we can come out of first word mode now.
-                            $todo['created'] = $word;
+            if (substr($line,0,1) == ' ' || substr($line,0,1) == "\t") {
+                $previousItem = count($todos) - 1;
+                $todos[$previousItem]['note'][] = $line;
+            } else {
+                $todo = newtodoarray();
+                $words = explode(' ',$line);
+                $firstword = TRUE;
+                foreach($words as $word){
+                    $letters = str_split($word);
+                    if ($firstword){
+                        if ($letters[0] == '('){
+                            // The word is the priority
+                            // We *should* hit a creation date after this, so stay in first word mode
+                            $todo['priority'] = $letters[1];
                             unset($word);
-                            $firstword = FALSE;
-                        } elseif($letters[0] == ' ' || $letters[0] == "\t") {
-                            // This is a note for the previous task
-                            // Append this to the previous task and skip out.
-                            $previousItem = count($todos) - 1;
-                            $todos[$previousItem]['notes'][] = $line;
-                            break;
                         } else {
-                            // This is something else. We can exit first word mode
-                            $firstword = FALSE;
+                            if(is_numeric($letters[0])){
+                                // This should be the creation date then
+                                // Creation date comes *after* priority so we can come out of first word mode now.
+                                $todo['created'] = $word;
+                                unset($word);
+                                $firstword = FALSE;
+                            } else {
+                                // This is something else. We can exit first word mode
+                                $firstword = FALSE;
+                            }
+                        }
+                    } 
+                    if (!$firstword && isset($word)){
+                        // We are out of first word mode and have a word to process.
+                        switch($letters[0]){
+                            // todo.txt standard items
+                            case '@': $todo['context'][] = $word; break;
+                            case '+': $todo['project'][] = $word; break;
+                            // Hashtag extension, seen elsewhere
+                            case '#': $todo['hashtag'][] = $word; break;
+                            // My extensions - Value and Waiting On
+                            case '_': $todo['waitingon'][] = $word; break;
+                            case '£': case '$': $todo['value'] = strval(substr($word,1)); break;
+                            default : 
+                                if (strstr($word,':')){
+                                    // This might be an extension, like due:XXXX
+                                    // If there is a space after the :, this breaks the magic
+                                    $worddata = explode(':',$word);
+                                    if (ltrim($word[1] == $word[1])){
+                                        $key = array_shift($worddata);
+                                        $todo['extensions'][$key] = implode(':',$worddata);
+                                    } else {
+                                        $todo['task'] .= $word . ' ';
+                                    }
+                                } 
                         }
                     }
-                } 
-                if (!$firstword && isset($word)){
-                    // We are out of first word mode and have a word to process.
-                    switch($letters[0]){
-                        // todo.txt standard items
-                        case '@': $todo['contexts'][] = $word; break;
-                        case '+': $todo['projects'][] = $word; break;
-                        // Hashtag extension, seen elsewhere
-                        case '#': $todo['hashtags'][] = $word; break;
-                        // My extensions - Value and Waiting On
-                        case '_': $todo['waitingon'][] = $word; break;
-                        case '£': case '$': $todo['value'] = strval(substr($word,1)); break;
-                        default : 
-                            if (strstr($word,':')){
-                                // This might be an extension, like due:XXXX
-                                // If there is a space after the :, this breaks the magic
-                                $worddata = explode(':',$word);
-                                if (ltrim($word[1] == $word[1])){
-                                    $key = array_shift($worddata);
-                                    $todo['extensions'][$key] = implode(':',$worddata);
-                                } else {
-                                    $todo['task'] .= $word . ' ';
-                                }
-                            } 
-                    }
+                    $todo['task'] .= $word . ' ';
                 }
-                $todo['task'] .= $word . ' ';
+                // Tidy up the task string
+                $todo['task'] = trim($todo['task']);
+                // Make a "line" ready to print
+                $todo['line'] = '(' . $todo['priority'] . ') ' . $todo['created'] . ' ' . $todo['task'];
+                $todos[] = $todo;    
             }
-            // Tidy up the task string
-            $todo['task'] = trim($todo['task']);
-            // Make a "line" ready to print
-            $todo['line'] = '(' . $todo['priority'] . ') ' . $todo['created'] . ' ' . $todo['task'];
-            $todos[] = $todo;
+            
         }
     }
     // Update each line with its notes, ready for printing
     foreach($todos as &$todo){
-        foreach($todo['notes'] as $note){
+        foreach($todo['note'] as $note){
             $todo['line'] .= "\n$note";
         }
     }
@@ -130,21 +142,23 @@ function todotxt_to_array($todotxt){
     $return = array('todos'=>array(),'projects'=>array(),'contexts'=>array(),'waitingons'=>array(),'hashtags'=>array());
     $return['todos'] = $todos;
     foreach($return['todos'] as $todo){
-        $return['projects'] = array_merge($return['projects'],$todo['projects']);
-        $return['contexts'] = array_merge($return['contexts'],$todo['contexts']);
-        $return['waitingson'] = array_merge($return['waitingons'],$todo['waitingons']);
-        $return['hashtags'] = array_merge($return['hashtags'],$todo['hashtags']);
+        $return['priority'][$todo['priority']] = $todo['priority'];
+        $return['project'] = array_merge($return['project'],$todo['project']);
+        $return['context'] = array_merge($return['context'],$todo['context']);
+        $return['waitingon'] = array_merge($return['waitingon'],$todo['waitingon']);
+        $return['hashtag'] = array_merge($return['hashtag'],$todo['hashtag']);
     }
     // Eliminate duplicate values
-    $return['projects'] = array_unique($return['projects']);
-    $return['contexts'] = array_unique($return['contexts']);
-    $return['waitingons'] = array_unique($return['waitingons']);
-    $return['hashtags'] = array_unique($return['hashtags']);
+    $return['project'] = array_unique($return['project']);
+    $return['context'] = array_unique($return['context']);
+    $return['waitingon'] = array_unique($return['waitingon']);
+    $return['hashtag'] = array_unique($return['hashtag']);
     // Sort the key arrays
-    sort($return['projects']);
-    sort($return['contexts']);
-    sort($return['waitingons']);
-    sort($return['hashtags']);
+    sort($return['priority']);
+    sort($return['project']);
+    sort($return['context']);
+    sort($return['waitingon']);
+    sort($return['hashtag']);
     
     return $return;
 }
