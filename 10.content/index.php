@@ -1,8 +1,8 @@
 <?php
 $file = '/home/chris/Dropbox/Apps/gtdbox/todo.txt';
 $todotxt = file_get_contents($file);
-$tasks = todotxt_to_array($todotxt);
-print '<pre>' . print_r($tasks,TRUE) . '</pre>';
+$todos = todotxt_to_array($todotxt);
+print '<pre>' . print_r($todos,TRUE) . '</pre>';
 // file_put_contents($file, $todotxt)
 
 ?>
@@ -56,7 +56,7 @@ function todotxt_to_array($todotxt){
         $line = rtrim($line);
         if (strlen($line) > 0){
             $todo = newtodoarray();
-            $words = explode(' ',$words);
+            $words = explode(' ',$line);
             $firstword = TRUE;
             foreach($words as $word){
                 $letters = str_split($word);
@@ -73,6 +73,12 @@ function todotxt_to_array($todotxt){
                             $todo['created'] = $word;
                             unset($word);
                             $firstword = FALSE;
+                        } elseif($letters[0] == ' ' || $letters[0] == "\t") {
+                            // This is a note for the previous task
+                            // Append this to the previous task and skip out.
+                            $previousItem = count($todos) - 1;
+                            $todos[$previousItem]['notes'][] = $line;
+                            break;
                         } else {
                             // This is something else. We can exit first word mode
                             $firstword = FALSE;
@@ -101,26 +107,56 @@ function todotxt_to_array($todotxt){
                                 } else {
                                     $todo['task'] .= $word . ' ';
                                 }
-                            } else {
-                                $todo['task'] .= $word . ' ';
-                            }
+                            } 
                     }
                 }
+                $todo['task'] .= $word . ' ';
             }
+            // Tidy up the task string
+            $todo['task'] = trim($todo['task']);
+            // Make a "line" ready to print
+            $todo['line'] = '(' . $todo['priority'] . ') ' . $todo['created'] . ' ' . $todo['task'];
             $todos[] = $todo;
         }
     }
+    // Update each line with its notes, ready for printing
+    foreach($todos as &$todo){
+        foreach($todo['notes'] as $note){
+            $todo['line'] .= "\n$note";
+        }
+    }
     
-    return $todos;
+    // Parse through the return and collect a list of Contexts, WaitingOns, Projects, and Hashtags
+    $return = array('todos'=>array(),'projects'=>array(),'contexts'=>array(),'waitingons'=>array(),'hashtags'=>array());
+    $return['todos'] = $todos;
+    foreach($return['todos'] as $todo){
+        $return['projects'] = array_merge($return['projects'],$todo['projects']);
+        $return['contexts'] = array_merge($return['contexts'],$todo['contexts']);
+        $return['waitingson'] = array_merge($return['waitingons'],$todo['waitingons']);
+        $return['hashtags'] = array_merge($return['hashtags'],$todo['hashtags']);
+    }
+    // Eliminate duplicate values
+    $return['projects'] = array_unique($return['projects']);
+    $return['contexts'] = array_unique($return['contexts']);
+    $return['waitingons'] = array_unique($return['waitingons']);
+    $return['hashtags'] = array_unique($return['hashtags']);
+    // Sort the key arrays
+    sort($return['projects']);
+    sort($return['contexts']);
+    sort($return['waitingons']);
+    sort($return['hashtags']);
+    
+    return $return;
 }
 
 function newtodoarray(){
-    return array('priority' => 'c','created' => time(),
+    return array('priority' => 'C','created' =>  date('Y-m-d'),
                  'contexts' => array(), 'projects' => array(), 
                  'hashtags' => array(), 'waitingon' => array(),
                  'task' => '',
                  'extensions' => array(),
-                 'value' => 0);
+                 'value' => 0,
+                 'notes' => array());
 }
 
 function array_to_todotxt($todoarray){
@@ -128,6 +164,7 @@ function array_to_todotxt($todoarray){
      * Transform a structured array of todo items into a string,
      * normally for writing back to a file.
      */
+    
 }
 
 function formattodotxt($todotxt){
